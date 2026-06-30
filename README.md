@@ -25,6 +25,34 @@ Built with modern Python and JavaScript technologies:
 - **Memory & State**: Redis (for chat history and SSE-like live polling status).
 - **Frontend**: Vanilla HTML/CSS/JS with modern APIs (Web Speech API, marked.js), featuring a responsive, SaaS-style glassmorphism UI.
 
+### System Flow
+```mermaid
+graph TD
+    A[User Query] --> B{Domain Guard}
+    B -- Non-Agri --> C[Reject Query]
+    B -- Agri --> D[Intent Router]
+    
+    D -- Extracts active flags --> E((CrewAI Orchestrator))
+    
+    E --> F[Weather Agent]
+    E --> G[Crop Agent]
+    E --> H[Disease Agent]
+    E --> I[Pest Agent]
+    E --> J[Fertilizer Agent]
+    E --> K[Yield Agent]
+    E --> L[Market Agent]
+    
+    F -.-> M[Coordinator Agent]
+    G -.-> M
+    H -.-> M
+    I -.-> M
+    J -.-> M
+    K -.-> M
+    L -.-> M
+    
+    M --> N[Structured Markdown Report]
+```
+
 For detailed information, refer to [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Installation
