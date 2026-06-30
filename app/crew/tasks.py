@@ -2,130 +2,73 @@
 
 from crewai import Task
 
-def create_tasks(agents, query: str, active_flags: dict = None):
-    """Factory function to instantiate the tasks based on user query and intent routing."""
+def create_tasks(agents, query: str):
+    """Factory function to instantiate all possible CrewAI tasks.
+    We will selectively filter these down during orchestration."""
     
-    if active_flags is None:
-        active_flags = {
-            "weather": True, "crop": True, "disease": True, 
-            "pest": True, "fertilizer": True, "yield_prediction": True, "market": True
-        }
-        
-    tasks = []
-    created_tasks = {}
-    
-    # Task 1: Weather
-    if active_flags.get('weather', True):
-        weather_task = Task(
-            description=f"Analyze the following user query to determine the location and fetch current weather and forecasts. Extract any agricultural weather implications. Query: '{query}'",
-            expected_output="A summary of the current weather, 7-day forecast, and immediate weather-related farming advice.",
-            agent=agents['weather']
-        )
-        tasks.append(weather_task)
-        created_tasks['weather'] = weather_task
-    
-    # Task 2: Crop
-    if active_flags.get('crop', True):
-        crop_context = []
-        if 'weather' in created_tasks:
-            crop_context.append(created_tasks['weather'])
-            
-        crop_task = Task(
-            description=f"Based on the weather data (if any) and the user's query, recommend suitable crops or analyze the user's current crop. Explain WHY. Query: '{query}'",
-            expected_output="A list of recommended crops with reasoning based on soil, climate, and water availability, or advice on the user's specific crop.",
-            agent=agents['crop'],
-            context=crop_context if crop_context else None
-        )
-        tasks.append(crop_task)
-        created_tasks['crop'] = crop_task
-    
-    # Task 3: Disease
-    if active_flags.get('disease', True):
-        disease_task = Task(
-            description=f"Check if the user's query mentions any plant disease symptoms or includes an image description. If so, diagnose it. Query: '{query}'",
-            expected_output="A diagnosis of the plant disease (if any), confidence level, symptoms, and organic/chemical treatments. If no disease is mentioned, output 'No disease symptoms reported.'",
-            agent=agents['disease']
-        )
-        tasks.append(disease_task)
-        created_tasks['disease'] = disease_task
-
-    # Task 4: Pest
-    if active_flags.get('pest', True):
-        pest_context = []
-        for key in ['weather', 'crop', 'disease']:
-            if key in created_tasks:
-                pest_context.append(created_tasks[key])
-                
-        pest_task = Task(
-            description=f"Predict likely pest attacks for the crops identified, factoring in the weather forecast and region. Provide control measures. Query: '{query}'",
-            expected_output="Predicted pests, risk levels, symptoms, and organic/chemical control measures.",
-            agent=agents['pest'],
-            context=pest_context if pest_context else None
-        )
-        tasks.append(pest_task)
-        created_tasks['pest'] = pest_task
-    
-    # Task 5: Fertilizer
-    if active_flags.get('fertilizer', True):
-        fert_context = []
-        for key in ['weather', 'crop']:
-            if key in created_tasks:
-                fert_context.append(created_tasks[key])
-                
-        fertilizer_task = Task(
-            description=f"Recommend a fertilizer schedule for the identified crops, considering the weather (e.g., don't fertilize before heavy rain). Query: '{query}'",
-            expected_output="Organic and chemical fertilizer recommendations, application schedules, and safety precautions.",
-            agent=agents['fertilizer'],
-            context=fert_context if fert_context else None
-        )
-        tasks.append(fertilizer_task)
-        created_tasks['fertilizer'] = fertilizer_task
-    
-    # Task 6: Yield
-    if active_flags.get('yield_prediction', True):
-        yield_context = []
-        for key in ['crop', 'fertilizer']:
-            if key in created_tasks:
-                yield_context.append(created_tasks[key])
-                
-        yield_task = Task(
-            description=f"If the user provided land area, predict the yield for the crop. Otherwise, provide general yield expectations per acre. Query: '{query}'",
-            expected_output="Expected yield, confidence, factors affecting yield, and improvement suggestions.",
-            agent=agents['yield'],
-            context=yield_context if yield_context else None
-        )
-        tasks.append(yield_task)
-        created_tasks['yield'] = yield_task
-    
-    # Task 7: Market
-    if active_flags.get('market', True):
-        market_context = []
-        for key in ['crop', 'yield']:
-            if key in created_tasks:
-                market_context.append(created_tasks[key])
-                
-        market_task = Task(
-            description=f"Analyze the market price and trends for the identified crop in the user's region. Query: '{query}'",
-            expected_output="Current market price, nearby market locations, historical trends, expected price movements, and best selling time.",
-            agent=agents['market'],
-            context=market_context if market_context else None
-        )
-        tasks.append(market_task)
-        created_tasks['market'] = market_task
-    
-    # Task 8: Coordination (Final Report) - ALWAYS RUNS
-    coordinator_task = Task(
-        description=(
-            f"Review the outputs from the specialized agents that were invoked. "
-            f"Merge them into a single, highly professional structured consultation report for the user's original query: '{query}'. "
-            f"Only include sections for the information provided by the agents. If an agent wasn't needed, omit its section. "
-            f"The final report must be in Markdown."
-        ),
-        expected_output="A complete, perfectly formatted Markdown report synthesizing all specialized agent advice provided.",
-        agent=agents['coordinator'],
-        context=tasks.copy() if tasks else None
+    # 1. Weather Task
+    weather_task = Task(
+        description=f"Fetch the current weather and 7-day forecast for the location mentioned in this query: '{query}'. If no location is mentioned, ask the user or default to the user's inferred region. Do not continue reasoning after a valid answer is available.",
+        expected_output="A summary of the current weather and forecast, including temperature, humidity, and rainfall.",
+        agent=agents['weather']
     )
     
-    tasks.append(coordinator_task)
+    # 2. Crop Task
+    crop_task = Task(
+        description=f"Recommend the top crops based on the supplied soil, weather, and region data in this query: '{query}'. Fetch weather data if necessary. Do not continue reasoning after a valid answer is available.",
+        expected_output="A list of recommended crops and reasons for their suitability.",
+        agent=agents['crop']
+    )
     
-    return tasks
+    # 3. Pest Task
+    pest_task = Task(
+        description=f"Identify potential pest threats and recommend specific IPM strategies for the crops mentioned in this query: '{query}'. Fetch weather data if necessary. Do not continue reasoning after a valid answer is available.",
+        expected_output="A list of potential pests and organic/chemical control measures.",
+        agent=agents['pest']
+    )
+    
+    # 4. Fertilizer Task
+    fertilizer_task = Task(
+        description=f"Recommend a specific fertilizer schedule and nutrient management plan for the crop mentioned in this query: '{query}'. Fetch weather data if necessary. Do not continue reasoning after a valid answer is available.",
+        expected_output="A detailed fertilizer schedule and nutrient management plan.",
+        agent=agents['fertilizer']
+    )
+    
+    # 5. Yield Task
+    yield_task = Task(
+        description=f"Predict the expected yield range based on the crop, area, and region mentioned in this query: '{query}'. Fetch weather data if necessary. Do not continue reasoning after a valid answer is available.",
+        expected_output="An estimated yield range in quintals or tons, with a confidence score.",
+        agent=agents['yield']
+    )
+    
+    # 6. Market Task
+    market_task = Task(
+        description=f"Get the current market price and 2-week forecast for the crop mentioned in this query: '{query}'. Do not continue reasoning after a valid answer is available.",
+        expected_output="Current market price, expected trends, and selling advice.",
+        agent=agents['market']
+    )
+    
+    # 7. Disease Task
+    disease_task = Task(
+        description=f"Identify the plant disease based on the symptoms described in this query: '{query}'. Recommend treatments. Fetch weather data if necessary. Do not continue reasoning after a valid answer is available.",
+        expected_output="Diagnosis of the disease and a step-by-step treatment plan.",
+        agent=agents['disease']
+    )
+    
+    # 8. Coordinator Task (Always executed last)
+    coordinator_task = Task(
+        description=f"Collect outputs from all executed agents regarding this query: '{query}'. Merge responses. Do not re-invoke other agents. Do not continue reasoning after a valid answer is available.",
+        expected_output="A cohesive, farmer-friendly Markdown report containing all insights.",
+        agent=agents['coordinator']
+    )
+    
+    return {
+        'weather': weather_task,
+        'crop': crop_task,
+        'pest': pest_task,
+        'fertilizer': fertilizer_task,
+        'yield': yield_task,
+        'market': market_task,
+        'disease': disease_task,
+        'coordinator': coordinator_task
+    }

@@ -4,7 +4,7 @@
 
 Raitha mitra is an AI-powered agricultural advisory application designed to help farmers with crop advice, pest control, soil health, weather information, and government schemes. It supports voice, text, and image-based crop disease diagnosis using state-of-the-art Large Language Models and Vision models.
 
-## Features
+## 🌟 Key Features
 
 - **Multi-Agent AI (CrewAI)**: Replaces a single LLM with a team of 8 specialized agents (Crop, Weather, Disease, Market, Pest, Fertilizer, Yield, and Coordinator) working sequentially to provide highly accurate, structured consultation reports.
 - **Bilingual Support (English & Kannada)**: Full localization with dynamic language switching (🌐). The UI, AI responses, and Voice features automatically adapt between English and Kannada (ಕನ್ನಡ).

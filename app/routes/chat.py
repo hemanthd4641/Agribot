@@ -214,6 +214,8 @@ def chat():
     response_data = _process_text_query(
         session_id, text, llm_service, memory_service, tts_service, domain_guard
     )
+    if not response_data.get('success', True):
+        return jsonify(response_data), 500
     return jsonify(response_data)
 
 
@@ -255,8 +257,8 @@ def get_chat_status():
     memory_service = current_app.memory_service
     status_key = f"crew_status:{session_id}"
     
-    if memory_service.redis_client:
-        status_data = memory_service.redis_client.get(status_key)
+    if memory_service.client:
+        status_data = memory_service.client.get(status_key)
         if status_data:
             return jsonify(json.loads(status_data))
     return jsonify([])
@@ -305,14 +307,40 @@ def _process_text_query(
             result['voice'] = f'/static/audio/{voice_filename}'
         return result
 
-    # 1. Get conversation history (We can keep this to maintain memory)
+    # 1. Get conversation history
     history = memory_service.get_conversation_history(session_id)
 
-    # 2. Generate response using CrewAI
-    crew = AgriCrew(session_id=session_id, groq_api_key=AppConfig.GROQ_API_KEY)
-    
-    # Run the crew
-    final_response = crew.kickoff(user_query=user_text)
+    # 2. Intent Routing
+    from app.services.intent_router import IntentRouter
+    router = IntentRouter()
+    intent = router.classify_intent(user_text)
+
+    if intent == "GENERAL_CHAT":
+        logger.info("Routing to GENERAL_CHAT fast-path.")
+        # Push UI status
+        if memory_service.client:
+            status_key = f"crew_status:{session_id}"
+            memory_service.client.setex(status_key, 3600, json.dumps([{"agent": "General Agriculture Assistant", "status": "completed"}]))
+            
+        llm_result = llm_service.generate(
+            user_query=user_text,
+            conversation_history=history,
+            session_id=session_id
+        )
+        final_response = llm_result.text
+    else:
+        logger.info("Routing to CrewAI (Intent: %s)", intent)
+        try:
+            crew = AgriCrew(session_id=session_id, groq_api_key=AppConfig.GROQ_API_KEY)
+            final_response = crew.kickoff(user_query=user_text, intent=intent)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {
+                "success": False,
+                "crew_error": str(e),
+                "traceback": traceback.format_exc()
+            }
 
     # 3. Save to memory
     memory_service.add_to_conversation(session_id, 'user', user_text)

@@ -8,6 +8,11 @@
     <meta name="description" content="Premium AI-powered agriculture assistant for expert advice on crops, pest control, soil health, weather, and more.">
     <meta name="author" content="Hemanth D">
     <meta name="theme-color" content="#09090b">
+    
+    <!-- PWA iOS Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
 
     <!-- Canonical URL -->
     <link rel="canonical" href="https://raithamitra.onrender.com/">
@@ -320,5 +325,16 @@
     <!-- Application Logic -->
     <script src="{{ url_for('static', filename='js/weather.js') }}"></script>
     <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+
+    <!-- PWA Service Worker -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/static/sw.js')
+            .then(reg => console.log('ServiceWorker registration successful', reg.scope))
+            .catch(err => console.log('ServiceWorker registration failed: ', err));
+        });
+      }
+    </script>
 </body>
 </html>

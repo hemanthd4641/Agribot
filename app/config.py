@@ -26,8 +26,8 @@ class AppConfig:
     ALLOWED_AUDIO_EXTENSIONS: set = {'webm', 'wav', 'mp3', 'ogg', 'm4a'}
 
     # LLM (Groq)
-    GROQ_API_KEY: Optional[str] = os.getenv('GROQ_API_KEY')
-    LLM_MODEL: str = os.getenv('LLM_MODEL', 'openai/gpt-oss-120b')
+    GROQ_API_KEY: Optional[str] = os.getenv('GROQ_API_KEY')    # LLM Settings (Use 8B for general chat/fallback to save 70B tokens for CrewAI)
+    LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.1-8b-instant")
     LLM_VISION_MODEL: str = os.getenv('LLM_VISION_MODEL', 'meta-llama/llama-4-scout-17b-16e-instruct')
     LLM_TEMPERATURE: float = float(os.getenv('LLM_TEMPERATURE', '0.3'))
     LLM_MAX_TOKENS: int = int(os.getenv('LLM_MAX_TOKENS', '1024'))

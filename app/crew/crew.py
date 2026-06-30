@@ -1,119 +1,132 @@
-"""CrewAI Orchestrator."""
+"""CrewAI Orchestrator - Hybrid Architecture.
+
+Executes a subset of specialized agents based on the detected intent.
+"""
 
 import json
 import logging
-from pydantic import BaseModel, Field
+import time
 from crewai import Crew, Process
 from langchain_groq import ChatGroq
-from langchain_core.prompts import PromptTemplate
 from app.crew.agents import create_agents
 from app.crew.tasks import create_tasks
 from flask import current_app
 
 logger = logging.getLogger(__name__)
 
-class IntentRouting(BaseModel):
-    """Pydantic model for extracting active domain flags from user query."""
-    weather: bool = Field(description="True if the query needs weather forecast or conditions.")
-    crop: bool = Field(description="True if the query needs crop recommendations, suitable planting, or general crop advice.")
-    disease: bool = Field(description="True if the query mentions plant diseases, spots, yellowing, or health issues (often from images).")
-    pest: bool = Field(description="True if the query mentions pests, bugs, insects, or pest control.")
-    fertilizer: bool = Field(description="True if the query mentions soil health, fertilizer, nutrients, or NPK.")
-    yield_prediction: bool = Field(description="True if the query asks about yield prediction, harvest amount, or production.")
-    market: bool = Field(description="True if the query mentions price, market, profit, or selling.")
-
 class AgriCrew:
-    """Manages the execution of the agricultural multi-agent system."""
+    """Manages the execution of the dynamic CrewAI pipeline."""
+
+    # We reuse the LLM and Agents across requests as requested ("Reuse LLM, Agents")
+    _shared_llm = None
+    _shared_agents = None
 
     def __init__(self, session_id: str, groq_api_key: str):
         self.session_id = session_id
         
-        # We reuse the existing Groq API key to power the Langchain LLM for CrewAI
-        self.llm = ChatGroq(
-            temperature=0.7,
-            model_name="llama-3.3-70b-versatile", # Or whichever model is configured
-            api_key=groq_api_key
-        )
-        
-        self.agents = create_agents(self.llm)
-
-    def _task_callback(self, task_output):
-        """Callback fired when a task completes. Updates Redis for frontend SSE/polling."""
-        try:
-            # We must be in app context here if called synchronously
-            memory_service = current_app.memory_service
-            
-            # CrewAI TaskOutput object has description, expected_output, raw, agent
-            # Try to extract agent role to update status
-            agent_role = getattr(task_output.agent, 'role', 'Coordinator') if hasattr(task_output, 'agent') else 'Unknown Agent'
-            
-            # Read current status list
-            status_key = f"crew_status:{self.session_id}"
-            current_status = memory_service.redis_client.get(status_key) if memory_service.redis_client else None
-            
-            status_list = json.loads(current_status) if current_status else []
-            status_list.append({
-                "agent": agent_role,
-                "status": "completed"
-            })
-            
-            if memory_service.redis_client:
-                memory_service.redis_client.setex(status_key, 3600, json.dumps(status_list))
-                
-        except Exception as e:
-            logger.error("Task callback error: %s", e)
-
-
-    def _route_intent(self, user_query: str) -> dict:
-        """Use LLM to determine which agents need to be invoked."""
-        try:
-            structured_llm = self.llm.with_structured_output(IntentRouting)
-            prompt = PromptTemplate.from_template(
-                "Analyze the agricultural query and determine which domains are strictly required to answer it.\n\nQuery: {query}"
+        if AgriCrew._shared_llm is None:
+            AgriCrew._shared_llm = ChatGroq(
+                temperature=0.7,
+                model_name="llama-3.3-70b-versatile",
+                api_key=groq_api_key
             )
-            chain = prompt | structured_llm
-            result = chain.invoke({"query": user_query})
-            return result.model_dump()
-        except Exception as e:
-            logger.error("Intent routing failed, defaulting to all agents: %s", e)
-            # Default to all True if router fails
-            return {
-                "weather": True, "crop": True, "disease": True, 
-                "pest": True, "fertilizer": True, "yield_prediction": True, "market": True
-            }
+            AgriCrew._shared_agents = create_agents(AgriCrew._shared_llm)
 
-    def kickoff(self, user_query: str) -> str:
-        """Execute the CrewAI flow for a given query."""
-        logger.info("Starting AgriCrew execution for session: %s", self.session_id)
-        
-        # 1. Route Intent
-        active_flags = self._route_intent(user_query)
-        logger.info("Intent Routing Result: %s", active_flags)
-
-        # 2. Reset status
+    def _push_ui_status(self, agent_name: str):
+        """Manually push status updates to Redis for the UI."""
         memory_service = current_app.memory_service
-        if memory_service.redis_client:
+        if memory_service and memory_service.client:
             status_key = f"crew_status:{self.session_id}"
-            memory_service.redis_client.setex(status_key, 3600, json.dumps([]))
-            
-        # 3. Create only the necessary tasks
-        tasks = create_tasks(self.agents, user_query, active_flags)
+            current_status = memory_service.client.get(status_key)
+            status_list = []
+            if current_status:
+                try:
+                    status_list = json.loads(current_status)
+                except json.JSONDecodeError:
+                    pass
+            status_list.append({"agent": agent_name, "status": "completed"})
+            memory_service.client.setex(status_key, 3600, json.dumps(status_list))
+
+    def kickoff(self, user_query: str, intent: str) -> str:
+        """Execute the CrewAI pipeline dynamically based on intent."""
+        start_exec_time = time.time()
+        logger.info("Starting CrewAI execution for intent: %s (session: %s)", intent, self.session_id)
         
-        # 4. Filter agents to only those that have assigned tasks (and the coordinator)
-        assigned_agents = list({task.agent for task in tasks if hasattr(task, 'agent')})
+        # Reset UI Status
+        memory_service = current_app.memory_service
+        if memory_service and memory_service.client:
+            status_key = f"crew_status:{self.session_id}"
+            memory_service.client.setex(status_key, 3600, json.dumps([]))
+
+        # Generate fresh tasks for this specific query
+        all_tasks = create_tasks(AgriCrew._shared_agents, user_query)
+        
+        # Select active tasks based on intent
+        active_agents = []
+        active_tasks = []
+        
+        def add_task(key: str):
+            if key not in [a.role for a in active_agents]:
+                active_agents.append(AgriCrew._shared_agents[key])
+                active_tasks.append(all_tasks[key])
+
+        # Routing Logic
+        if intent == "WEATHER":
+            add_task('weather')
+        elif intent == "CROP_RECOMMENDATION":
+            add_task('crop')
+        elif intent == "DISEASE_DETECTION":
+            add_task('disease')
+        elif intent == "YIELD_PREDICTION":
+            add_task('yield')
+        elif intent == "FERTILIZER_RECOMMENDATION":
+            add_task('fertilizer')
+        elif intent == "PEST_PREDICTION":
+            add_task('pest')
+        elif intent == "MARKET_PRICE":
+            add_task('market')
+        else:
+            add_task('crop') # Fallback
+            
+        # Always add coordinator
+        add_task('coordinator')
+            
+        logger.info("Selected Agent for %s: %s", intent, [a.role for a in active_agents])
+        
+        for agent in active_agents:
+            self._push_ui_status(agent.role)
+
+        logger.info(f"DEBUG: Detected intent = {intent}")
+        logger.info(f"DEBUG: Selected agents = {[a.role for a in active_agents]}")
+        logger.info(f"DEBUG: Selected tasks = {[t.description for t in active_tasks]}")
         
         crew = Crew(
-            agents=assigned_agents,
-            tasks=tasks,
+            agents=active_agents,
+            tasks=active_tasks,
             process=Process.sequential,
-            verbose=True,
-            task_callback=self._task_callback
+            verbose=False,
+            memory=False # Reduce token usage
         )
         
-        # Execute the crew
-        # CrewAI's kickoff returns a CrewOutput object. The final string is typically in raw
-        result = crew.kickoff()
+        try:
+            logger.info("DEBUG: Crew kickoff started")
+            result = crew.kickoff()
+            final_report = result.raw if hasattr(result, 'raw') else str(result)
+            logger.info("DEBUG: Crew kickoff completed successfully")
+        except Exception as e:
+            import traceback
+            print("====================================")
+            print("CREW FAILURE DETECTED")
+            print("====================================")
+            print(f"Exception type: {type(e).__name__}")
+            print("Full stack trace:")
+            traceback.print_exc()
+            print("====================================")
+            logger.error("CrewAI execution failed: %s", e)
+            raise e # Let chat.py catch this and fallback to standard LLM
         
-        if hasattr(result, 'raw'):
-            return result.raw
-        return str(result)
+        total_time = time.time() - start_exec_time
+        logger.info(f"CrewAI execution completed in {total_time:.2f}s.")
+        self._push_ui_status("Final Report Ready")
+        
+        return final_report

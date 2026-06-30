@@ -58,7 +58,7 @@ class DomainGuard:
 
             prompt = (
                 "You are a strict domain classifier. Analyze the following text and determine if it is "
-                "related to agriculture, farming, crops, livestock, soil, fertilizers, or agricultural weather.\n"
+                "related to agriculture, farming, crops, livestock, soil, fertilizers, agricultural weather, or government agricultural schemes/subsidies (like PM-KISAN).\n"
                 "Return ONLY a JSON object with two keys: 'is_agriculture' (boolean) and 'confidence' (integer from 0 to 100).\n\n"
                 f"Text to analyze: \"{text}\""
             )
@@ -152,7 +152,7 @@ class DomainGuard:
         return (
             "I am an Agriculture AI Assistant and can only assist with farming-related topics such as "
             "crop diseases, soil health, fertilizers, irrigation, weather-based farming advice, "
-            "pest management, and agricultural best practices."
+            "pest management, agricultural schemes (like PM-KISAN), and agricultural best practices."
         )
 
     def _get_image_refusal_message(self) -> str:

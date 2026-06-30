@@ -79,6 +79,13 @@ document.addEventListener('DOMContentLoaded', () => {
             window.speechSynthesis.onvoiceschanged = () => {
                 window.speechSynthesis.getVoices();
             };
+            
+            // Speak welcome message
+            setTimeout(() => {
+                const welcomeTitle = t('welcome.title', 'How can I help your farm today?');
+                const welcomeSubtitle = t('welcome.subtitle', 'Get expert insights on crops, soil health, pests, and local weather patterns.');
+                playVoice(`${welcomeTitle} ${welcomeSubtitle}`);
+            }, 1000);
         }
     }
 
@@ -147,8 +154,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        DOM.mobileMenuBtn.addEventListener('click', () => DOM.sidebar.classList.add('open'));
-        DOM.closeSidebarBtn.addEventListener('click', () => DOM.sidebar.classList.remove('open'));
+        DOM.mobileMenuBtn.addEventListener('click', () => DOM.sidebar.classList.add('mobile-open'));
+        DOM.closeSidebarBtn.addEventListener('click', () => DOM.sidebar.classList.remove('mobile-open'));
         
         DOM.attachBtn.addEventListener('click', () => DOM.fileInput.click());
         DOM.fileInput.addEventListener('change', handleFileSelect);
@@ -345,8 +352,6 @@ document.addEventListener('DOMContentLoaded', () => {
             removeTypingIndicator();
             if (data.text) {
                 appendMessage(data.text, 'bot', data.cache);
-                // Native Frontend TTS
-                playVoice(data.text);
             }
             
         } catch (error) {
@@ -541,7 +546,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (data.text) {
                 appendMessage(data.text, 'bot', data.cache);
-                playVoice(data.text);
             }
             
         } catch (error) {
