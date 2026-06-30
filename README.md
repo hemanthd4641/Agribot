@@ -6,23 +6,24 @@ Raitha mitra is an AI-powered agricultural advisory application designed to help
 
 ## Features
 
-- **Crop Disease Diagnosis**: Upload a photo of your crop, and Raitha mitra will analyze it for diseases, pests, or nutrient deficiencies.
-- **Voice Support (Multilingual)**: Speak your queries and hear responses using advanced STT (Speech-to-Text) and TTS (Text-to-Speech).
-- **Comprehensive Agricultural Advisory**: Ask questions about best planting times, fertilizers, pest control, and weather.
-- **Weather Intelligence**: Built-in Open-Meteo free API integration for current weather, 7-day forecasting, and smart agricultural insights.
-- **Government Schemes**: Get information on PM-KISAN and other relevant agricultural schemes.
-- **Modern Web Interface**: Fully responsive, SaaS-style glassmorphism UI with dark/light modes.
-- **Chat History**: Redis-backed conversation memory for context-aware interactions.
-- **Data Export**: Download chat history as PDF or Markdown.
+- **Multi-Agent AI (CrewAI)**: Replaces a single LLM with a team of 8 specialized agents (Crop, Weather, Disease, Market, Pest, Fertilizer, Yield, and Coordinator) working sequentially to provide highly accurate, structured consultation reports.
+- **Bilingual Support (English & Kannada)**: Full localization with dynamic language switching (🌐). The UI, AI responses, and Voice features automatically adapt between English and Kannada (ಕನ್ನಡ).
+- **Strict Domain Guard**: A robust pre-processing layer ensures the assistant *strictly* rejects non-agricultural queries (medical, legal, financial, etc.).
+- **Crop Disease Diagnosis**: Upload a photo of your crop, and Raitha mitra will analyze it using Vision models for diseases and pests.
+- **Voice Input & Output**: Native Browser Speech Recognition (STT) and Speech Synthesis (TTS) for seamless hands-free interactions in both English and Kannada.
+- **Weather Intelligence**: Live weather panels with Open-Meteo API integrations providing 7-day forecasting and smart farming advisory.
+- **Live Status Polling**: An interactive "AI Experts Working..." UI panel that updates in real-time as the multi-agent crew executes tasks.
+- **Chat History & Export**: Redis-backed conversation memory with the ability to download chat history as PDF.
 
 ## Architecture
 
 Built with modern Python and JavaScript technologies:
 
-- **Backend**: Flask (Python)
-- **AI Integration**: LangChain, Groq API (LLaMA-3, Whisper, Orpheus)
-- **Memory**: Redis
-- **Frontend**: Vanilla HTML/CSS/JS with modern APIs (Web Speech API, marked.js, highlight.js)
+- **Backend**: Flask (Python) with a clean service-oriented architecture.
+- **Orchestration**: CrewAI for multi-agent workflows.
+- **AI Integration**: LangChain, Groq API (LLaMA-3 70B, Vision Models).
+- **Memory & State**: Redis (for chat history and SSE-like live polling status).
+- **Frontend**: Vanilla HTML/CSS/JS with modern APIs (Web Speech API, marked.js), featuring a responsive, SaaS-style glassmorphism UI.
 
 For detailed information, refer to [ARCHITECTURE.md](ARCHITECTURE.md).
 
