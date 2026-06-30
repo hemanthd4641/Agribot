@@ -1,6 +1,6 @@
 # Raitha mitra API Documentation
 
-This document provides comprehensive details for the Raitha mitra API endpoints. The API allows you to interact with the chatbot via text and voice, returning agriculture-related responses powered by OpenAI and HuggingFace models.
+This document provides comprehensive details for the Raitha mitra API endpoints. The API allows you to interact with the multi-agent CrewAI system to get highly structured, professional agricultural advice.
 
 ## Base URL
 
@@ -12,204 +12,100 @@ http://127.0.0.1:5000
 
 ## Authentication
 
-All API requests require an API key and a HuggingFace token, which are configured on the server side via environment variables. Client requests do not need to pass these keys; they are stored securely in the backend.
+All API requests require a Groq API key configured on the server side via the `GROQ_API_KEY` environment variable.
 
 ## Endpoints
 
-### 1. Text Chat
+### 1. Chat Interaction (Text, Voice, Image)
 
-Send a text message and receive a response.
+Send a text message, voice recording, or image and receive a structured consultation report from the CrewAI orchestration layer.
 
 **Endpoint:** `POST /chat`
 
-**Request Body (JSON):**
+**Request Body (FormData/JSON):**
 
 | Field    | Type   | Required | Description                                      |
 |----------|--------|----------|--------------------------------------------------|
-| `message`| string | Yes      | The user's text query related to agriculture.    |
+| `text`   | string | No*      | The user's text query related to agriculture.    |
+| `audio`  | File   | No*      | Audio file (WAV, MP3) with speech.               |
+| `image`  | File   | No       | Image file for disease detection (JPG, PNG).     |
 
-**Example Request:**
-
-```bash
-curl -X POST http://127.0.0.1:5000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "What is the best time to plant wheat in India?"}'
-```
+*\* Either `text` or `audio` is required.*
 
 **Success Response (200 OK):**
 
 ```json
 {
-  "response": "The best time to plant wheat in India is during the Rabi season, typically from October to December. The crop requires cool temperatures during the growing period and warm temperatures at harvest.",
-  "confidence": 0.94
+  "text": "## Weather Summary\n...\n## Crop Recommendation\n...",
+  "voice": "/static/audio/response_12345.wav",
+  "transcription": "What is the best time to plant wheat?" // Only if audio was sent
 }
 ```
 
-**Error Responses:**
+---
 
-- **400 Bad Request:** If `message` is missing or empty.
-  ```json
+### 2. Live Agent Status (SSE/Polling)
+
+Poll this endpoint while a `/chat` request is processing to get the live status of the active AI Agents (e.g. Weather Analyst, Crop Specialist).
+
+**Endpoint:** `GET /chat/status`
+
+**Success Response (200 OK):**
+
+```json
+[
   {
-    "error": "Message field is required and cannot be empty."
-  }
-  ```
-- **500 Internal Server Error:** If the OpenAI API call fails.
-  ```json
+    "agent": "Weather Analyst",
+    "status": "completed"
+  },
   {
-    "error": "Failed to generate response due to server error."
+    "agent": "Crop Specialist",
+    "status": "completed"
   }
-  ```
+]
+```
 
 ---
 
-### 2. Voice Input
+### 3. Clear Chat History
 
-Upload an audio file containing speech, and receive a text transcript along with an AI-generated response.
+Clear the conversation history for the current session.
 
-**Endpoint:** `POST /voice`
-
-**Request (multipart/form-data):**
-
-| Field   | Type | Required | Description                                   |
-|---------|------|----------|-----------------------------------------------|
-| `audio` | File | Yes      | Audio file (WAV, MP3, or OGG) with speech.    |
-
-**Example Request:**
-
-```bash
-curl -X POST http://127.0.0.1:5000/voice \
-  -F "audio=@question.wav"
-```
+**Endpoint:** `POST /chat/clear`
 
 **Success Response (200 OK):**
 
 ```json
 {
-  "transcription": "What is the best time to plant wheat in India?",
-  "response": "The best time to plant wheat in India is during the Rabi season, typically from October to December.",
-  "audio_response": "/static/responses/response_12345.wav"
+  "status": "ok",
+  "message": "Conversation cleared."
 }
 ```
 
-The `audio_response` field is a relative URL to a WAV file containing a spoken version of the response (synthesized using a text-to-speech model).
-
-**Error Responses:**
-
-- **400 Bad Request:** No audio file provided or unsupported format.
-  ```json
-  {
-    "error": "Audio file is required. Supported formats: WAV, MP3, OGG."
-  }
-  ```
-- **500 Internal Server Error:** If HuggingFace STT/TTS or OpenAI fails.
-  ```json
-  {
-    "error": "Voice processing failed. Please try again later."
-  }
-  ```
-
 ---
 
-### 3. Health Check
+### 4. Health Check
 
-Verify that the API is running and healthy.
+Verify that the API and Redis are running and healthy.
 
 **Endpoint:** `GET /health`
-
-**Example Request:**
-
-```bash
-curl http://127.0.0.1:5000/health
-```
 
 **Success Response (200 OK):**
 
 ```json
 {
   "status": "healthy",
-  "models": {
-    "text": "OpenAI GPT-3.5",
-    "stt": "Wav2Vec2-Large-960h",
-    "tts": "Tacotron2"
-  }
+  "redis": "connected",
+  "timestamp": "2026-06-30T10:00:00.000000"
 }
 ```
 
 ---
 
-### 4. Weather
+## Domain Guard
 
-Fetch real-time weather and 7-day forecasts for a specific city.
-
-**Endpoint:** `GET /weather`
-
-**Query Parameters:**
-| Parameter | Type   | Required | Description |
-|-----------|--------|----------|-------------|
-| `city`    | string | Yes      | The name of the city (e.g., "Delhi") |
-
-**Example Request:**
-```bash
-curl "http://127.0.0.1:5000/weather?city=Delhi"
-```
-
-**Success Response (200 OK):**
-```json
-{
-  "status": "success",
-  "location": {
-    "name": "Delhi, India",
-    "latitude": 28.6139,
-    "longitude": 77.209
-  },
-  "weather": {
-    "current": {
-      "temperature_2m": 32.5,
-      "relative_humidity_2m": 45,
-      "wind_speed_10m": 12.2,
-      "precipitation": 0.0,
-      "weather_code": 1
-    },
-    "daily": {
-      "time": ["2023-10-25", "2023-10-26"],
-      "temperature_2m_max": [34.0, 33.5],
-      "temperature_2m_min": [22.0, 21.5]
-    }
-  }
-}
-```
-
----
+Raitha mitra implements a strict Domain Guard. Any request unrelated to agriculture (e.g., medical, financial, political) will be intercepted before reaching the LLM and immediately rejected with an error message in the `text` field.
 
 ## Rate Limiting
 
-Requests are limited to 60 per minute per IP address. Exceeding this limit will result in a **429 Too Many Requests** response:
-
-```json
-{
-  "error": "Rate limit exceeded. Please wait and try again."
-}
-```
-
-## Error Codes Summary
-
-| Status Code | Meaning                    |
-|-------------|----------------------------|
-| 200         | Success                    |
-| 400         | Bad Request (invalid input)| 
-| 429         | Rate limit exceeded        |
-| 500         | Internal server error      |
-
-## FAQ
-
-**Q: Can I use this API without an OpenAI key?**  
-A: No, the server requires a valid OpenAI API key configured in the environment variable `OPENAI_API_KEY`.
-
-**Q: Are there any costs for using the API?**  
-A: Usage of the API incurs costs from OpenAI and HuggingFace based on your own keys. The bot itself is free and open-source.
-
-**Q: How long are audio responses stored?**  
-A: Generated audio files are stored temporarily for 15 minutes and then deleted automatically.
-
-**Q: Is the API suitable for production use?**  
-A: This API is provided as-is for demonstration purposes. For production, consider adding authentication, HTTPS, and scaling the backend.
+Requests are rate limited. Exceeding the limit will result in a **429 Too Many Requests** response.

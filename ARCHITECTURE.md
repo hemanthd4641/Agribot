@@ -1,32 +1,36 @@
-# Architecture — Raitha mitra v2.0
+# Architecture — Raitha mitra v3.0
 
 ## Overview
 
-Raitha mitra is a full-stack AI agriculture assistant. Flask backend + Groq SDK for all AI services, Redis for session memory, glassmorphism frontend. Class-based services following SOLID principles.
+Raitha mitra is a full-stack AI agriculture assistant powered by a CrewAI multi-agent orchestration system. It features a Flask backend, Groq SDK for ultra-fast LLM inference, Redis for session memory and live polling, and a modern glassmorphism frontend with bilingual (English/Kannada) support.
 
 ## Architecture Diagram
 
-```
-Browser (jQuery + Glassmorphism CSS)
-    │
-    ├── GET /             → index.html
-    ├── POST /chat        → text query
-    ├── POST /chat        → image + text (multipart)
-    ├── POST /chat        → audio blob (multipart)
-    ├── POST /chat/clear  → clear session
-    └── GET /health       → health check
-    │
-Flask (WSGI)
-    │
-    ├── main_bp          → index, robots.txt, sitemap.xml, llms.txt
-    ├── chat_bp          → /chat, /chat/clear, /health
-    │
-    └── Services (attached to app)
-         ├── LLMService       → Groq SDK (openai/gpt-oss-120b)
-         ├── MemoryService    → Redis + in-memory fallback
-         ├── STTService       → Groq Whisper (whisper-large-v3-turbo)
-         ├── TTSService       → Groq Orpheus (canopylabs/orpheus-v1-english)
-         └── PromptManager    → XML + CoT system prompt
+```mermaid
+graph TD
+    A[User Query] --> B{Domain Guard}
+    B -- Non-Agri --> C[Reject Query]
+    B -- Agri --> D[Intent Router]
+    
+    D -- Extracts active flags --> E((CrewAI Orchestrator))
+    
+    E --> F[Weather Agent]
+    E --> G[Crop Agent]
+    E --> H[Disease Agent]
+    E --> I[Pest Agent]
+    E --> J[Fertilizer Agent]
+    E --> K[Yield Agent]
+    E --> L[Market Agent]
+    
+    F -.-> M[Coordinator Agent]
+    G -.-> M
+    H -.-> M
+    I -.-> M
+    J -.-> M
+    K -.-> M
+    L -.-> M
+    
+    M --> N[Structured Markdown Report]
 ```
 
 ## Components
@@ -35,102 +39,36 @@ Flask (WSGI)
 
 | File | Purpose |
 |------|---------|
-| `templates/index.html` | Main template with SEO, JSON-LD, OG tags |
-| `static/css/style.css` | Glassmorphism UI, dark/light theme |
-| `static/js/chat.js` | Chat logic, image upload, voice recording |
+| `templates/index.html` | Main template with AI Experts Status Panel |
+| `static/css/style.css` | Glassmorphism UI, dynamic language swapping |
+| `static/js/chat.js` | Chat logic, `/chat/status` polling, localized Voice APIs |
 
-Features: Text input, image upload with preview, voice recording, theme toggle, cache badge display.
+### 2. Backend (`app/routes/` and `app/services/`)
 
-### 2. Backend (`app/`)
+| Component | Responsibility |
+|-----------|---------------|
+| `chat.py` | Handles POST /chat, Domain Guard pre-processing, and delegates to AgriCrew. |
+| `AgriCrew`| CrewAI orchestrator that builds tasks and executes sequential agents. |
+| `Intent Router` | Fast Pydantic/LangChain extraction to bypass unnecessary agents. |
+| `DomainGuard` | Strict pre-processing check to reject non-agricultural requests. |
+| `MemoryService`| Redis conversation history + agent execution status for frontend polling. |
 
-**App Factory** (`app/__init__.py`):
-- `create_app()` → Flask factory with config, blueprints, services
+### 3. AI Models (Groq)
 
-**Routes** (`app/routes/`):
+| Model | Use |
+|-------|-----|
+| `llama-3.3-70b-versatile` | CrewAI logic, Intent Routing, and Text generation |
+| `llama-3.2-90b-vision-preview` | Image disease diagnosis |
+| `whisper-large-v3-turbo` | Speech-to-text (STT) |
 
-| Blueprint | Endpoints | Purpose |
-|-----------|-----------|---------|
-| `main_bp` | `GET /`, `/robots.txt`, `/sitemap.xml`, `/llms.txt` | Pages + SEO |
-| `chat_bp` | `POST /chat`, `POST /chat/clear`, `GET /health` | Chat API |
+### 4. Live Agent Polling
 
-**Services** (`app/services/`):
-
-| Service | Responsibility |
-|---------|---------------|
-| `LLMService` | Groq SDK calls, vision model, cache tracking, markdown stripping |
-| `MemoryService` | Redis conversation history with in-memory fallback |
-| `STTService` | Groq Whisper audio transcription |
-| `TTSService` | Groq Orpheus text-to-speech |
-| `PromptManager` | XML + CoT system prompt, message building |
-
-### 3. AI Models (all Groq)
-
-| Model | Use | Endpoint |
-|-------|-----|----------|
-| `openai/gpt-oss-120b` | Text chat | Chat Completions |
-| `meta-llama/llama-4-scout-17b-16e-instruct` | Image analysis | Chat Completions (multimodal) |
-| `whisper-large-v3-turbo` | Speech-to-text | Audio Transcriptions |
-| `canopylabs/orpheus-v1-english` | Text-to-speech | Audio Speech |
-
-### 4. Memory (Redis)
-
-- Session-scoped conversation history stored as JSON lists in Redis.
-- Automatic TTL expiry (configurable, default 1 hour).
-- **In-memory fallback** when Redis is unavailable — conversations persist within the same process but are lost on restart.
-
-## Data Flows
-
-### Text Chat
-```
-User types message → POST /chat (text)
-  → MemoryService.get_conversation_history()
-  → LLMService.generate(user_query, history)
-    → build_messages(system_prompt + history + query)
-    → Groq API call (text model)
-    → strip_markdown(response)
-  → MemoryService.add_to_conversation(user + assistant)
-  → TTSService.synthesize(response)
-  → Return JSON { text, voice, cache }
-```
-
-### Image Analysis
-```
-User uploads image → POST /chat (image + text)
-  → Read + base64-encode image
-  → LLMService.generate_with_image(query, image_b64)
-    → build_messages with image_url (multimodal)
-    → Groq API call (vision model)
-    → strip_markdown(response)
-  → MemoryService.add_to_conversation
-  → TTSService.synthesize
-  → Return JSON { text, voice, cache }
-```
-
-### Voice Chat
-```
-User records audio → POST /chat (audio)
-  → Save audio file
-  → STTService.transcribe(file)
-    → Groq Whisper API
-  → _process_text_query(transcription)
-  → Delete temp audio file
-  → Return JSON { text, voice, transcription }
-```
-
-## Prompt Caching
-
-Groq automatically caches static prompt prefixes across requests:
-- System prompt (~500 tokens) → cached from request 1
-- Conversation history → prefix grows but cached on subsequent requests
-- Only the new user query is processed fresh
-- 50% cost discount on cached tokens
-- Cache stats returned in every response
+Because CrewAI execution can take time, the backend pushes completed task agent roles into a Redis list scoped to the user's `session_id`.
+The frontend polls `GET /chat/status` every second to display a live "AI Experts Working..." UI panel.
 
 ## Deployment
 
 | Method | Config |
 |--------|--------|
-| Local dev | `uv run python run.py` |
-| Render | `render.yaml` + `Dockerfile` |
-| Docker | `docker build . && docker run -p 10000:10000` |
-| Production | Gunicorn via `gunicorn.conf.py` |
+| Render | `render.yaml` + `requirements.txt` |
+| Local  | `python run.py` |
