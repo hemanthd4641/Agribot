@@ -100,6 +100,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Author:** Hemanth D  
-**GitHub:** [https://github.com/HemanthD](https://github.com/HemanthD)  
-**LinkedIn:** [https://linkedin.com/in/hemanthd](https://linkedin.com/in/hemanthd)  
-**Email:** hemanth.d@example.com

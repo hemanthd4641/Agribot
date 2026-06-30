@@ -123,9 +123,11 @@ SYSTEM_PROMPT_XML = """<role>
 </response_format>
 
 <language_guideline>
-    - Respond in the same language the farmer uses.
-    - If the farmer uses Hinglish (Hindi + English), respond in Hinglish.
-    - Keep English simple — avoid jargon without explanation.
+    - Always respond in the same language as the user.
+    - If the user speaks Kannada, answer entirely in Kannada.
+    - If the user speaks English, answer entirely in English.
+    - If mixed language is used, intelligently respond using the dominant language.
+    - Never translate scientific names.
 </language_guideline>
 
 <fallback_protocol>

@@ -1,6 +1,6 @@
 /**
  * Raitha mitra - Frontend Logic
- * Refactored for modularity, modern UI features, and performance.
+ * Refactored for modularity, modern UI features, performance, and bilingual support.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -12,6 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedFile: null,
         mediaRecorder: null,
         audioChunks: [],
+        uiLang: localStorage.getItem('agri-ui-lang') || 'en',
+        translations: {},
+        currentUtterance: null,
         settings: {
             theme: localStorage.getItem('agri-theme') || 'dark',
             fontSize: localStorage.getItem('agri-font-size') || 'normal',
@@ -22,20 +25,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- DOM Elements ---
     const DOM = {
-        // Layout
         html: document.documentElement,
         body: document.body,
         sidebar: document.getElementById('sidebar'),
         mobileMenuBtn: document.getElementById('mobileMenuBtn'),
         closeSidebarBtn: document.getElementById('closeSidebarBtn'),
-        
-        // Chat Area
         chatArea: document.getElementById('chatArea'),
         chatMessages: document.getElementById('chatMessages'),
         welcomeScreen: document.getElementById('welcomeScreen'),
         scrollToBottomBtn: document.getElementById('scrollToBottomBtn'),
-        
-        // Input Area
         messageInput: document.getElementById('messageInput'),
         sendBtn: document.getElementById('sendBtn'),
         voiceBtn: document.getElementById('voiceBtn'),
@@ -45,14 +43,11 @@ document.addEventListener('DOMContentLoaded', () => {
         imagePreviewArea: document.getElementById('imagePreviewArea'),
         imagePreviewElement: document.getElementById('imagePreviewElement'),
         removeImageBtn: document.getElementById('removeImageBtn'),
-        
-        // Actions
         newChatBtn: document.getElementById('newChatBtn'),
         clearChatBtn: document.getElementById('clearChatBtn'),
         downloadChatBtn: document.getElementById('downloadChatBtn'),
         themeToggleBtn: document.getElementById('themeToggleBtn'),
-        
-        // Settings Modal
+        uiLangSelect: document.getElementById('uiLangSelect'),
         settingsModal: document.getElementById('settingsModal'),
         openSettingsBtn: document.getElementById('openSettingsBtn'),
         closeSettingsBtn: document.getElementById('closeSettingsBtn'),
@@ -61,9 +56,6 @@ document.addEventListener('DOMContentLoaded', () => {
         speechSpeedRange: document.getElementById('speechSpeedRange'),
         speedLabel: document.getElementById('speedLabel'),
         languageSelect: document.getElementById('languageSelect'),
-        
-        // Misc
-        audioPlayer: document.getElementById('audioPlayer'),
         toastContainer: document.getElementById('toastContainer'),
         featureCards: document.querySelectorAll('.feature-card')
     };
@@ -71,12 +63,49 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Initialization ---
     init();
 
-    function init() {
+    async function init() {
         applySettings();
         setupEventListeners();
         setupMarked();
         checkScroll();
+        await loadTranslations();
         DOM.messageInput.focus();
+        
+        // Setup voices
+        if (window.speechSynthesis) {
+            window.speechSynthesis.onvoiceschanged = () => {
+                window.speechSynthesis.getVoices();
+            };
+        }
+    }
+
+    // --- i18n ---
+    async function loadTranslations() {
+        if (DOM.uiLangSelect) DOM.uiLangSelect.value = state.uiLang;
+        try {
+            const res = await fetch(`/static/locales/${state.uiLang}.json`);
+            if (res.ok) {
+                state.translations = await res.json();
+                applyTranslations();
+            }
+        } catch (e) {
+            console.error('Failed to load translations', e);
+        }
+    }
+
+    function applyTranslations() {
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if (state.translations[key]) el.textContent = state.translations[key];
+        });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+            const key = el.getAttribute('data-i18n-placeholder');
+            if (state.translations[key]) el.setAttribute('placeholder', state.translations[key]);
+        });
+    }
+
+    function t(key, fallback) {
+        return state.translations[key] || fallback || key;
     }
 
     // --- Markdown Configuration ---
@@ -96,10 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Event Listeners ---
     function setupEventListeners() {
-        // Auto-resize textarea
         DOM.messageInput.addEventListener('input', handleTextareaInput);
-        
-        // Send message (Enter to send, Shift+Enter for new line)
         DOM.messageInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -109,7 +135,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         DOM.sendBtn.addEventListener('click', sendMessage);
         
-        // Feature Cards Click
         DOM.featureCards.forEach(card => {
             card.addEventListener('click', () => {
                 const prompt = card.getAttribute('data-prompt');
@@ -119,11 +144,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // Sidebar Toggle (Mobile)
         DOM.mobileMenuBtn.addEventListener('click', () => DOM.sidebar.classList.add('open'));
         DOM.closeSidebarBtn.addEventListener('click', () => DOM.sidebar.classList.remove('open'));
         
-        // File Upload (Drag & Drop + Click)
         DOM.attachBtn.addEventListener('click', () => DOM.fileInput.click());
         DOM.fileInput.addEventListener('change', handleFileSelect);
         DOM.removeImageBtn.addEventListener('click', clearImagePreview);
@@ -132,27 +155,31 @@ document.addEventListener('DOMContentLoaded', () => {
         DOM.dropZone.addEventListener('dragleave', () => DOM.dropZone.classList.remove('drag-over'));
         DOM.dropZone.addEventListener('drop', handleFileDrop);
 
-        // Voice
         DOM.voiceBtn.addEventListener('click', toggleRecording);
         
-        // Actions
         DOM.newChatBtn.addEventListener('click', clearConversation);
         DOM.clearChatBtn.addEventListener('click', clearConversation);
         DOM.downloadChatBtn.addEventListener('click', downloadChatPDF);
         DOM.themeToggleBtn.addEventListener('click', toggleThemeAction);
         
-        // Scroll Management
+        if (DOM.uiLangSelect) {
+            DOM.uiLangSelect.addEventListener('change', async (e) => {
+                state.uiLang = e.target.value;
+                localStorage.setItem('agri-ui-lang', state.uiLang);
+                await loadTranslations();
+                if (window.updateWeatherLang) window.updateWeatherLang();
+            });
+        }
+        
         DOM.chatArea.addEventListener('scroll', checkScroll);
         DOM.scrollToBottomBtn.addEventListener('click', scrollToBottom);
 
-        // Settings Modal
         DOM.openSettingsBtn.addEventListener('click', () => DOM.settingsModal.classList.add('active'));
         DOM.closeSettingsBtn.addEventListener('click', () => DOM.settingsModal.classList.remove('active'));
         DOM.settingsModal.addEventListener('click', (e) => {
             if (e.target === DOM.settingsModal) DOM.settingsModal.classList.remove('active');
         });
         
-        // Settings Changes
         DOM.themeOptions.forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const theme = e.currentTarget.getAttribute('data-theme');
@@ -177,21 +204,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function applySettings() {
-        // Theme
         DOM.html.setAttribute('data-theme', state.settings.theme);
         DOM.themeOptions.forEach(btn => {
             btn.classList.toggle('active', btn.getAttribute('data-theme') === state.settings.theme);
         });
         
-        // Font Size
         DOM.body.setAttribute('data-font-size', state.settings.fontSize);
         DOM.fontSizeSelect.value = state.settings.fontSize;
         
-        // Speech
         DOM.speechSpeedRange.value = state.settings.speechSpeed;
         DOM.speedLabel.textContent = `${parseFloat(state.settings.speechSpeed).toFixed(1)}x`;
-        if (DOM.audioPlayer) DOM.audioPlayer.playbackRate = state.settings.speechSpeed;
-        
         DOM.languageSelect.value = state.settings.language;
     }
 
@@ -200,7 +222,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSetting('theme', newTheme);
     }
 
-    // --- Input Handling ---
     function handleTextareaInput() {
         const input = DOM.messageInput;
         input.style.height = 'auto';
@@ -210,7 +231,6 @@ document.addEventListener('DOMContentLoaded', () => {
         DOM.sendBtn.disabled = !hasValue && !state.selectedFile;
     }
 
-    // --- File Handling ---
     function handleFileSelect(e) {
         const file = e.target.files[0];
         processFile(file);
@@ -227,11 +247,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function processFile(file) {
         if (!file) return;
         if (!file.type.startsWith('image/')) {
-            showToast('Only image files are supported.', 'error');
+            showToast(t('error.unsupported_file', 'Only image files are supported.'), 'error');
             return;
         }
         if (file.size > 4 * 1024 * 1024) {
-            showToast('Image is too large. Max 4MB allowed.', 'error');
+            showToast(t('error.file_too_large', 'Image is too large. Max 4MB allowed.'), 'error');
             return;
         }
         
@@ -240,7 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.onload = (e) => {
             DOM.imagePreviewElement.src = e.target.result;
             DOM.imagePreviewArea.classList.add('active');
-            handleTextareaInput(); // Enable send button
+            handleTextareaInput();
         };
         reader.readAsDataURL(file);
     }
@@ -253,10 +273,8 @@ document.addEventListener('DOMContentLoaded', () => {
         handleTextareaInput();
     }
 
-    // --- Scroll Management ---
     function checkScroll() {
         const { scrollTop, scrollHeight, clientHeight } = DOM.chatArea;
-        // Show button if not at the bottom
         if (scrollHeight - scrollTop - clientHeight > 100) {
             DOM.scrollToBottomBtn.classList.add('visible');
         } else {
@@ -271,7 +289,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Chat Logic ---
     async function sendMessage() {
         const text = DOM.messageInput.value.trim();
         const hasImage = state.selectedFile !== null;
@@ -280,31 +297,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let queryText = text;
         if (!queryText && hasImage) {
-            queryText = 'Please analyze this image from an agricultural perspective.';
+            queryText = t('prompt.image', 'Please analyze this image from an agricultural perspective.');
         }
 
-        // Setup UI for processing
         state.isProcessing = true;
         DOM.messageInput.value = '';
-        handleTextareaInput(); // reset height & disable send button
+        handleTextareaInput();
         DOM.sendBtn.disabled = true;
         DOM.voiceBtn.disabled = true;
         DOM.attachBtn.disabled = true;
         
-        // Hide welcome screen if present
         if (DOM.welcomeScreen) {
             DOM.welcomeScreen.style.display = 'none';
         }
 
-        // Add user message to UI
         const imageSrc = hasImage ? DOM.imagePreviewElement.src : null;
         appendMessage(queryText, 'user', null, imageSrc);
         
-        // Save file reference and clear preview
         const fileToSend = state.selectedFile;
         clearImagePreview();
         
-        // Show typing indicator
         showTypingIndicator();
 
         try {
@@ -316,7 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const response = await fetch('/chat', {
                 method: 'POST',
-                body: formData // Fetch sets Content-Type automatically for FormData
+                body: formData
             });
 
             if (!response.ok) {
@@ -329,14 +341,15 @@ document.addEventListener('DOMContentLoaded', () => {
             removeTypingIndicator();
             if (data.text) {
                 appendMessage(data.text, 'bot', data.cache);
-                if (data.voice) playVoice(data.voice);
+                // Native Frontend TTS
+                playVoice(data.text);
             }
             
         } catch (error) {
             console.error('Chat error:', error);
             removeTypingIndicator();
-            appendMessage(`Sorry, an error occurred: ${error.message}. Please try again.`, 'bot');
-            showToast('Message failed to send', 'error');
+            appendMessage(`${t('error.send_failed', 'Sorry, an error occurred:')} ${error.message}`, 'bot');
+            showToast(t('error.send_failed', 'Message failed to send'), 'error');
         } finally {
             state.isProcessing = false;
             DOM.voiceBtn.disabled = false;
@@ -345,7 +358,34 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Voice Recording ---
+    // --- Voice Recording (STT) ---
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = null;
+    
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            DOM.messageInput.value = transcript;
+            handleTextareaInput();
+            sendMessage();
+            stopRecording();
+        };
+        
+        recognition.onerror = (event) => {
+            console.error('Speech recognition error:', event.error);
+            showToast(t('error.audio_failed', 'Audio processing failed.'), 'error');
+            stopRecording();
+        };
+        
+        recognition.onend = () => {
+            if (state.isRecording) stopRecording();
+        };
+    }
+
     function toggleRecording() {
         if (state.isRecording) {
             stopRecording();
@@ -354,7 +394,35 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function startRecording() {
+    function startRecording() {
+        if (SpeechRecognition) {
+            recognition.lang = state.settings.language;
+            try {
+                recognition.start();
+                state.isRecording = true;
+                DOM.voiceBtn.classList.add('recording');
+                showToast(t('msg.listening', 'Listening...'), 'info');
+            } catch (e) {
+                console.error("Recognition start error", e);
+                fallbackAudioRecording();
+            }
+        } else {
+            fallbackAudioRecording();
+        }
+    }
+
+    function stopRecording() {
+        if (SpeechRecognition && state.isRecording) {
+            recognition.stop();
+        }
+        if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
+            state.mediaRecorder.stop();
+        }
+        state.isRecording = false;
+        DOM.voiceBtn.classList.remove('recording');
+    }
+
+    async function fallbackAudioRecording() {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             showToast('Voice recording is not supported in your browser.', 'error');
             return;
@@ -364,7 +432,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             state.audioChunks = [];
             
-            // Try to use a compressed format
             let options = {};
             if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
                 options = { mimeType: 'audio/webm;codecs=opus' };
@@ -382,23 +449,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 sendAudio(blob);
             };
             
-            state.mediaRecorder.start(250); // collect chunks every 250ms
+            state.mediaRecorder.start(250);
             state.isRecording = true;
             DOM.voiceBtn.classList.add('recording');
-            showToast('Listening...', 'info');
+            showToast(t('msg.listening', 'Listening...'), 'info');
             
         } catch (error) {
             console.error('Mic error:', error);
             showToast('Microphone access denied or error occurred.', 'error');
         }
-    }
-
-    function stopRecording() {
-        if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
-            state.mediaRecorder.stop();
-        }
-        state.isRecording = false;
-        DOM.voiceBtn.classList.remove('recording');
     }
 
     async function sendAudio(blob) {
@@ -409,7 +468,7 @@ document.addEventListener('DOMContentLoaded', () => {
         DOM.voiceBtn.disabled = true;
         
         if (DOM.welcomeScreen) DOM.welcomeScreen.style.display = 'none';
-        showTypingIndicator(); // Show indicator while transcribing and processing
+        showTypingIndicator(); 
 
         try {
             const fd = new FormData();
@@ -430,14 +489,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (data.text) {
                 appendMessage(data.text, 'bot', data.cache);
-                if (data.voice) playVoice(data.voice);
+                playVoice(data.text);
             }
             
         } catch (error) {
             console.error('Audio error:', error);
             removeTypingIndicator();
-            appendMessage('Sorry, could not process your voice request.', 'bot');
-            showToast('Audio processing failed', 'error');
+            appendMessage(t('error.audio_failed', 'Sorry, could not process your voice request.'), 'bot');
+            showToast(t('error.audio_failed', 'Audio processing failed'), 'error');
         } finally {
             state.isProcessing = false;
             DOM.voiceBtn.disabled = false;
@@ -446,11 +505,37 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function playVoice(src) {
-        if (!src) return;
-        DOM.audioPlayer.src = src;
-        DOM.audioPlayer.playbackRate = state.settings.speechSpeed;
-        DOM.audioPlayer.play().catch(e => console.warn('Audio auto-play prevented', e));
+    // --- Voice Synthesis (Native TTS) ---
+    function playVoice(text) {
+        if (!window.speechSynthesis) return;
+        
+        // Stop any current audio
+        stopVoice();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = state.settings.speechSpeed;
+        
+        // Use browser detection or settings to pick correct voice
+        const isKannada = /[\u0C80-\u0CFF]/.test(text); // Regex to detect Kannada unicode block
+        let langCode = isKannada ? 'kn-IN' : state.settings.language;
+        utterance.lang = langCode;
+
+        // Try to pick a specific voice for the language
+        const voices = window.speechSynthesis.getVoices();
+        const preferredVoice = voices.find(v => v.lang.startsWith(langCode.substring(0, 2)));
+        if (preferredVoice) {
+            utterance.voice = preferredVoice;
+        }
+
+        state.currentUtterance = utterance;
+        window.speechSynthesis.speak(utterance);
+    }
+    
+    function stopVoice() {
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+            state.currentUtterance = null;
+        }
     }
 
     // --- UI Helpers ---
@@ -459,26 +544,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const msgDiv = document.createElement('div');
         msgDiv.className = `message ${type}`;
         
-        // Avatar icon
         const iconClass = isUser ? 'ph-user' : 'ph-plant';
-        const avatarColorClass = isUser ? '' : 'brand-bg';
-        
-        // Image tag if present
         const imgTag = imageUrl ? `<img class="message-image" src="${imageUrl}" alt="Uploaded image">` : '';
         
-        // Content Formatting (Markdown for bot)
         let formattedText = escapeHtml(text).replace(/\n/g, '<br>');
         if (!isUser && typeof marked !== 'undefined') {
             formattedText = marked.parse(text);
         }
 
-        // Cache Tag
         let cacheTag = '';
         if (cache && cache.cached_tokens > 0) {
             cacheTag = `<div class="cache-badge" title="Prompt Tokens: ${cache.prompt_tokens}, Cached: ${cache.cached_tokens}"><i class="ph-fill ph-lightning"></i> ${cache.hit_rate}% Cached</div>`;
         }
         
-        // Current Time
         const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
         msgDiv.innerHTML = `
@@ -498,6 +576,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         <button class="msg-action-btn copy-btn" title="Copy response" data-text="${escapeHtml(text)}">
                             <i class="ph ph-copy"></i>
                         </button>
+                        <button class="msg-action-btn play-btn" title="Play Voice">
+                            <i class="ph ph-play-circle"></i>
+                        </button>
+                        <button class="msg-action-btn stop-btn" title="Stop Voice">
+                            <i class="ph ph-stop-circle"></i>
+                        </button>
                     </div>
                     ` : ''}
                 </div>
@@ -506,18 +590,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
         DOM.chatMessages.appendChild(msgDiv);
         
-        // Bind copy event
         if (!isUser) {
             const copyBtn = msgDiv.querySelector('.copy-btn');
             if (copyBtn) {
                 copyBtn.addEventListener('click', (e) => {
                     const txt = e.currentTarget.getAttribute('data-text');
                     navigator.clipboard.writeText(txt).then(() => {
-                        showToast('Copied to clipboard', 'success');
+                        showToast(t('msg.copied', 'Copied to clipboard'), 'success');
                         const icon = copyBtn.querySelector('i');
                         icon.className = 'ph ph-check text-success';
                         setTimeout(() => { icon.className = 'ph ph-copy'; }, 2000);
                     });
+                });
+            }
+            
+            const playBtn = msgDiv.querySelector('.play-btn');
+            const stopBtn = msgDiv.querySelector('.stop-btn');
+            
+            if (playBtn) {
+                playBtn.addEventListener('click', () => {
+                    playVoice(text);
+                });
+            }
+            if (stopBtn) {
+                stopBtn.addEventListener('click', () => {
+                    stopVoice();
                 });
             }
         }
@@ -551,7 +648,6 @@ document.addEventListener('DOMContentLoaded', () => {
              .replace(/'/g, "&#039;");
     }
 
-    // --- Actions ---
     async function clearConversation() {
         const msgCount = DOM.chatMessages.querySelectorAll('.message').length;
         if (msgCount === 0) return;
@@ -560,12 +656,11 @@ document.addEventListener('DOMContentLoaded', () => {
         
         try {
             await fetch('/chat/clear', { method: 'POST' });
-            // Clean DOM
             const msgs = DOM.chatMessages.querySelectorAll('.message, .typing-indicator');
             msgs.forEach(m => m.remove());
             if (DOM.welcomeScreen) DOM.welcomeScreen.style.display = 'flex';
             if (window.innerWidth <= 768) DOM.sidebar.classList.remove('open');
-            showToast('Conversation cleared', 'success');
+            showToast(t('msg.cleared', 'Conversation cleared'), 'success');
         } catch (e) {
             console.error('Failed to clear:', e);
             showToast('Failed to clear conversation', 'error');
@@ -585,16 +680,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         showToast('Preparing PDF...', 'info');
         
-        // Create a clone of messages to avoid messing up the UI scrolling during render
         const elementToPrint = document.createElement('div');
         elementToPrint.style.padding = '20px';
-        elementToPrint.style.backgroundColor = '#ffffff'; // Force light bg for PDF
+        elementToPrint.style.backgroundColor = '#ffffff'; 
         elementToPrint.style.color = '#000000';
         elementToPrint.innerHTML = `
             <h2 style="text-align:center; margin-bottom: 20px; font-family: sans-serif;">Raitha mitra - Chat Log</h2>
         `;
         
-        // Clone messages and adapt styles for printing
         const clone = DOM.chatMessages.cloneNode(true);
         const welcome = clone.querySelector('.welcome-screen');
         if (welcome) welcome.remove();
@@ -603,21 +696,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const opt = {
             margin:       10,
-            filename:     `Raitha mitra_Chat_${new Date().toISOString().slice(0,10)}.pdf`,
+            filename:     `Raitha_mitra_Chat_${new Date().toISOString().slice(0,10)}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
             html2canvas:  { scale: 2, useCORS: true },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
         html2pdf().set(opt).from(elementToPrint).save().then(() => {
-            showToast('Chat downloaded successfully', 'success');
+            showToast(t('msg.pdf_success', 'Chat downloaded successfully'), 'success');
         }).catch(err => {
             console.error('PDF error:', err);
-            showToast('Failed to generate PDF', 'error');
+            showToast(t('msg.pdf_error', 'Failed to generate PDF'), 'error');
         });
     }
 
-    // --- Toast Notifications ---
     function showToast(message, type = 'info') {
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
@@ -633,11 +725,12 @@ document.addEventListener('DOMContentLoaded', () => {
         
         DOM.toastContainer.appendChild(toast);
         
-        // Remove after 3 seconds
         setTimeout(() => {
             toast.classList.add('fade-out');
             setTimeout(() => toast.remove(), 300);
         }, 3000);
     }
 
+    // Expose reload translations so weather.js can hook into it
+    window.agri_t = t;
 });

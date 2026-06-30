@@ -22,10 +22,10 @@
     <meta name="llms-txt" content="/llms.txt">
     <meta name="ai-content-declaration" content="human-reviewed">
 
-    <!-- Google Fonts: Inter -->
+    <!-- Google Fonts: Inter and Noto Sans Kannada -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Kannada:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Phosphor Icons (Premium Look) -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -49,7 +49,7 @@
                     <div class="brand-logo">
                         <i class="ph-fill ph-plant"></i>
                     </div>
-                    <span class="brand-name">Raitha mitra</span>
+                    <span class="brand-name" data-i18n="app.title">Raitha mitra</span>
                 </div>
                 <button class="icon-btn mobile-close-btn" id="closeSidebarBtn" title="Close Sidebar" aria-label="Close Sidebar">
                     <i class="ph ph-x"></i>
@@ -59,25 +59,25 @@
             <div class="sidebar-actions">
                 <button class="btn-primary w-full" id="newChatBtn">
                     <i class="ph ph-plus"></i>
-                    <span>New Chat</span>
+                    <span data-i18n="nav.new_chat">New Chat</span>
                 </button>
             </div>
 
             <div class="sidebar-search">
                 <div class="search-input-wrapper">
                     <i class="ph ph-magnifying-glass"></i>
-                    <input type="text" id="chatSearchInput" placeholder="Search chats..." aria-label="Search chats">
+                    <input type="text" id="chatSearchInput" placeholder="Search chats..." data-i18n-placeholder="nav.search_chats" aria-label="Search chats">
                 </div>
             </div>
 
             <div class="sidebar-nav">
                 <div class="nav-section">
-                    <h4 class="nav-title">Recent Conversations</h4>
+                    <h4 class="nav-title" data-i18n="nav.recent_conversations">Recent Conversations</h4>
                     <ul class="chat-list" id="chatHistoryList">
                         <!-- Populated by JS -->
                         <li class="chat-item active">
                             <i class="ph ph-chat-teardrop-text"></i>
-                            <span class="chat-title">Current Session</span>
+                            <span class="chat-title" data-i18n="nav.current_session">Current Session</span>
                         </li>
                     </ul>
                 </div>
@@ -91,7 +91,7 @@
                         </div>
                         <div class="user-info">
                             <span class="user-name">Hemanth D</span>
-                            <span class="user-role">Farmer Account</span>
+                            <span class="user-role" data-i18n="user.role">Farmer Account</span>
                         </div>
                     </div>
                     <i class="ph ph-gear"></i>
@@ -109,10 +109,14 @@
                         <i class="ph ph-list"></i>
                     </button>
                     <div class="model-selector">
-                        <span class="model-name">Raitha mitra Pro <i class="ph-fill ph-sparkle"></i></span>
+                        <span class="model-name"><span data-i18n="bot.model">Raitha mitra Pro</span> <i class="ph-fill ph-sparkle"></i></span>
                     </div>
                 </div>
                 <div class="topbar-right">
+                    <select id="uiLangSelect" class="form-select small lang-switcher">
+                        <option value="en">🇬🇧 English</option>
+                        <option value="kn">🇮🇳 ಕನ್ನಡ</option>
+                    </select>
                     <button class="icon-btn" id="openWeatherBtn" title="Weather" aria-label="Weather">
                         <i class="ph ph-cloud-sun"></i>
                     </button>
@@ -137,30 +141,30 @@
                             <div class="hero-icon">
                                 <i class="ph-fill ph-plant"></i>
                             </div>
-                            <h1>How can I help your farm today?</h1>
-                            <p>Get expert insights on crops, soil health, pests, and local weather patterns.</p>
+                            <h1 data-i18n="welcome.title">How can I help your farm today?</h1>
+                            <p data-i18n="welcome.subtitle">Get expert insights on crops, soil health, pests, and local weather patterns.</p>
                         </div>
                         
                         <div class="feature-cards">
                             <div class="feature-card" data-prompt="Analyze this crop image for diseases">
                                 <div class="card-icon"><i class="ph ph-scan"></i></div>
-                                <h3>Crop Diagnosis</h3>
-                                <p>Upload a photo to identify diseases and pests instantly.</p>
+                                <h3 data-i18n="card.diagnosis.title">Crop Diagnosis</h3>
+                                <p data-i18n="card.diagnosis.desc">Upload a photo to identify diseases and pests instantly.</p>
                             </div>
                             <div class="feature-card" data-prompt="What are the latest PM-KISAN updates?">
                                 <div class="card-icon"><i class="ph ph-bank"></i></div>
-                                <h3>Govt Schemes</h3>
-                                <p>Stay updated on the latest farming subsidies.</p>
+                                <h3 data-i18n="card.schemes.title">Govt Schemes</h3>
+                                <p data-i18n="card.schemes.desc">Stay updated on the latest farming subsidies.</p>
                             </div>
                             <div class="feature-card" data-prompt="What fertilizer is best for wheat in winter?">
                                 <div class="card-icon"><i class="ph ph-drop"></i></div>
-                                <h3>Soil & Fertilizer</h3>
-                                <p>Optimize your yield with tailored nutrient advice.</p>
+                                <h3 data-i18n="card.soil.title">Soil & Fertilizer</h3>
+                                <p data-i18n="card.soil.desc">Optimize your yield with tailored nutrient advice.</p>
                             </div>
                             <div class="feature-card" data-prompt="Provide a weather forecast for farming">
                                 <div class="card-icon"><i class="ph ph-cloud-sun"></i></div>
-                                <h3>Weather Advisory</h3>
-                                <p>Plan your sowing and harvesting around the weather.</p>
+                                <h3 data-i18n="card.weather.title">Weather Advisory</h3>
+                                <p data-i18n="card.weather.desc">Plan your sowing and harvesting around the weather.</p>
                             </div>
                         </div>
                     </div>
@@ -192,7 +196,7 @@
                     </button>
                     <input type="file" id="fileInput" accept="image/*" class="hidden" aria-hidden="true">
                     
-                    <textarea class="chat-input" id="messageInput" placeholder="Ask about crops, pests, or drop an image here..." rows="1" aria-label="Message"></textarea>
+                    <textarea class="chat-input" id="messageInput" placeholder="Ask about crops, pests, or drop an image here..." data-i18n-placeholder="input.placeholder" rows="1" aria-label="Message"></textarea>
                     
                     <div class="input-actions">
                         <button class="icon-btn voice-btn" id="voiceBtn" title="Record Voice" aria-label="Record Voice">
@@ -205,7 +209,7 @@
                 </div>
                 
                 <div class="input-footer">
-                    <span>Raitha mitra can make mistakes. Consider verifying critical agricultural advice.</span>
+                    <span data-i18n="input.disclaimer">Raitha mitra can make mistakes. Consider verifying critical agricultural advice.</span>
                 </div>
             </div>
         </main>
@@ -213,14 +217,14 @@
         <!-- Weather Panel (Sliding right panel) -->
         <aside class="weather-panel" id="weatherPanel">
             <div class="weather-header">
-                <h2>Weather Advisory</h2>
+                <h2 data-i18n="weather.title">Weather Advisory</h2>
                 <button class="icon-btn" id="closeWeatherBtn"><i class="ph ph-x"></i></button>
             </div>
             <div class="weather-body">
                 <div class="weather-search">
                     <div class="search-input-wrapper">
                         <i class="ph ph-magnifying-glass"></i>
-                        <input type="text" id="weatherSearchInput" placeholder="Search city...">
+                        <input type="text" id="weatherSearchInput" placeholder="Search city..." data-i18n-placeholder="weather.search">
                         <button class="icon-btn small" id="weatherSearchBtn"><i class="ph ph-arrow-right"></i></button>
                     </div>
                 </div>
@@ -243,19 +247,19 @@
     <div class="modal-overlay" id="settingsModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Settings</h2>
+                <h2 data-i18n="settings.title">Settings</h2>
                 <button class="icon-btn close-modal" id="closeSettingsBtn"><i class="ph ph-x"></i></button>
             </div>
             <div class="modal-body">
                 <div class="setting-group">
-                    <label>Appearance</label>
+                    <label data-i18n="settings.appearance">Appearance</label>
                     <div class="theme-selector">
-                        <button class="theme-option active" data-theme="dark"><i class="ph ph-moon"></i> Dark</button>
-                        <button class="theme-option" data-theme="light"><i class="ph ph-sun"></i> Light</button>
+                        <button class="theme-option active" data-theme="dark"><i class="ph ph-moon"></i> <span data-i18n="settings.dark">Dark</span></button>
+                        <button class="theme-option" data-theme="light"><i class="ph ph-sun"></i> <span data-i18n="settings.light">Light</span></button>
                     </div>
                 </div>
                 <div class="setting-group">
-                    <label>Text Size</label>
+                    <label data-i18n="settings.text_size">Text Size</label>
                     <select id="fontSizeSelect" class="form-select">
                         <option value="small">Small</option>
                         <option value="normal" selected>Normal</option>
@@ -263,7 +267,7 @@
                     </select>
                 </div>
                 <div class="setting-group">
-                    <label>Speech Speed</label>
+                    <label data-i18n="settings.speech_speed">Speech Speed</label>
                     <input type="range" id="speechSpeedRange" min="0.5" max="2" step="0.1" value="1.0" class="form-range">
                     <div class="range-labels">
                         <span>0.5x</span>
@@ -272,9 +276,10 @@
                     </div>
                 </div>
                 <div class="setting-group">
-                    <label>Preferred Language (Voice)</label>
+                    <label data-i18n="settings.language">Preferred Language (Voice)</label>
                     <select id="languageSelect" class="form-select">
                         <option value="en-IN" selected>English (India)</option>
+                        <option value="kn-IN">Kannada (ಕನ್ನಡ)</option>
                         <option value="hi-IN">Hindi</option>
                         <option value="te-IN">Telugu</option>
                         <option value="ta-IN">Tamil</option>
