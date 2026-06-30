@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
         uiLang: localStorage.getItem('agri-ui-lang') || 'en',
         translations: {},
         currentUtterance: null,
+        pollingInterval: null,
         settings: {
             theme: localStorage.getItem('agri-theme') || 'dark',
             fontSize: localStorage.getItem('agri-font-size') || 'normal',
@@ -57,7 +58,9 @@ document.addEventListener('DOMContentLoaded', () => {
         speedLabel: document.getElementById('speedLabel'),
         languageSelect: document.getElementById('languageSelect'),
         toastContainer: document.getElementById('toastContainer'),
-        featureCards: document.querySelectorAll('.feature-card')
+        featureCards: document.querySelectorAll('.feature-card'),
+        crewStatusPanel: document.getElementById('crewStatusPanel'),
+        crewAgentsList: document.getElementById('crewAgentsList')
     };
 
     // --- Initialization ---
@@ -318,6 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clearImagePreview();
         
         showTypingIndicator();
+        startCrewPolling();
 
         try {
             const formData = new FormData();
@@ -351,10 +355,58 @@ document.addEventListener('DOMContentLoaded', () => {
             appendMessage(`${t('error.send_failed', 'Sorry, an error occurred:')} ${error.message}`, 'bot');
             showToast(t('error.send_failed', 'Message failed to send'), 'error');
         } finally {
+            stopCrewPolling();
             state.isProcessing = false;
             DOM.voiceBtn.disabled = false;
             DOM.attachBtn.disabled = false;
             DOM.messageInput.focus();
+        }
+    }
+
+    // --- CrewAI Status Polling ---
+    function startCrewPolling() {
+        if (DOM.crewStatusPanel) {
+            DOM.crewStatusPanel.classList.remove('hidden');
+            DOM.crewAgentsList.innerHTML = '<li class="running"><i class="ph ph-spinner-gap spin"></i> <span>Initializing Multi-Agent Crew...</span></li>';
+            scrollToBottom();
+        }
+        
+        state.pollingInterval = setInterval(async () => {
+            try {
+                const res = await fetch('/chat/status');
+                if (!res.ok) return;
+                const data = await res.json();
+                
+                if (data && data.length > 0) {
+                    let html = '';
+                    const seenAgents = new Set();
+                    
+                    data.forEach(item => {
+                        if (!seenAgents.has(item.agent)) {
+                            seenAgents.add(item.agent);
+                            const icon = item.status === 'completed' ? 'ph-check-circle text-success' : 'ph-spinner-gap spin';
+                            html += `<li class="${item.status}"><i class="ph-fill ${icon}"></i> <span>${item.agent}</span></li>`;
+                        }
+                    });
+                    
+                    if (DOM.crewAgentsList.innerHTML !== html) {
+                        DOM.crewAgentsList.innerHTML = html;
+                        scrollToBottom();
+                    }
+                }
+            } catch (e) {
+                console.warn('Crew polling error:', e);
+            }
+        }, 1000);
+    }
+
+    function stopCrewPolling() {
+        if (state.pollingInterval) {
+            clearInterval(state.pollingInterval);
+            state.pollingInterval = null;
+        }
+        if (DOM.crewStatusPanel) {
+            DOM.crewStatusPanel.classList.add('hidden');
         }
     }
 

@@ -7,6 +7,7 @@ Redis-backed memory, and LLM processing.
 import base64
 import logging
 import os
+import json
 from datetime import datetime
 from typing import Dict, Optional, Tuple
 
@@ -15,6 +16,7 @@ from flask import (
 )
 from werkzeug.utils import secure_filename
 
+from app.crew.crew import AgriCrew
 from app.config import AppConfig
 
 logger = logging.getLogger(__name__)
@@ -246,6 +248,19 @@ def health_check():
     })
 
 
+@chat_bp.route('/chat/status', methods=['GET'])
+def get_chat_status():
+    """Poll endpoint for CrewAI execution status."""
+    session_id = _get_session_id()
+    memory_service = current_app.memory_service
+    status_key = f"crew_status:{session_id}"
+    
+    if memory_service.redis_client:
+        status_data = memory_service.redis_client.get(status_key)
+        if status_data:
+            return jsonify(json.loads(status_data))
+    return jsonify([])
+
 # --------------------------------------------------------------------------- #
 #  Internal Processing                                                        #
 # --------------------------------------------------------------------------- #
@@ -290,31 +305,22 @@ def _process_text_query(
             result['voice'] = f'/static/audio/{voice_filename}'
         return result
 
-    # 1. Get conversation history
+    # 1. Get conversation history (We can keep this to maintain memory)
     history = memory_service.get_conversation_history(session_id)
 
-    # 2. Generate LLM response (with prompt caching)
-    llm_result = llm_service.generate(
-        user_query=user_text,
-        conversation_history=history,
-        session_id=session_id,
-    )
+    # 2. Generate response using CrewAI
+    crew = AgriCrew(session_id=session_id, groq_api_key=AppConfig.GROQ_API_KEY)
+    
+    # Run the crew
+    final_response = crew.kickoff(user_query=user_text)
 
     # 3. Save to memory
     memory_service.add_to_conversation(session_id, 'user', user_text)
-    memory_service.add_to_conversation(session_id, 'assistant', llm_result.text)
+    memory_service.add_to_conversation(session_id, 'assistant', final_response)
 
-    # 4. Generate audio
-    voice_filename = tts_service.synthesize(llm_result.text)
-    result: Dict = {'text': llm_result.text}
-
-    # Add cache metrics for monitoring
-    result['cache'] = {
-        'prompt_tokens': llm_result.prompt_tokens,
-        'cached_tokens': llm_result.cached_tokens,
-        'hit_rate': round(llm_result.cache_hit_rate, 1),
-        'completion_tokens': llm_result.completion_tokens,
-    }
+    # 4. Generate audio (Warning: generating TTS for a huge report might be slow, but we keep it as requested)
+    voice_filename = tts_service.synthesize(final_response)
+    result: Dict = {'text': final_response}
 
     if voice_filename:
         result['voice'] = f'/static/audio/{voice_filename}'

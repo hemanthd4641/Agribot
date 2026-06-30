@@ -1313,3 +1313,57 @@ body[data-font-size="large"] {
         width: 100%;
     }
 }
+
+/* ==========================================================================
+   CrewAI Status Panel
+   ========================================================================== */
+.crew-status-panel {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--brand-primary);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    margin: var(--spacing-sm) auto var(--spacing-lg);
+    max-width: 800px;
+    width: 100%;
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.1);
+}
+
+.crew-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--brand-primary);
+    font-weight: 600;
+    margin-bottom: var(--spacing-sm);
+}
+
+.crew-agents {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 0.85rem;
+}
+
+.crew-agents li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+}
+
+.crew-agents li.completed {
+    color: var(--text-primary);
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+    color: var(--brand-secondary);
+}
+
+@keyframes spin {
+    100% { transform: rotate(360deg); }
+}
+
+.text-success {
+    color: var(--brand-primary) !important;
+}
