@@ -83,6 +83,7 @@ def initialize_services(app: Flask) -> None:
     from app.services.stt_service import STTService
     from app.services.tts_service import TTSService
     from app.services.weather_service import WeatherService
+    from app.services.domain_guard import DomainGuard
     from app.services.prompt_manager import PromptManager
 
     app.llm_service = LLMService()
@@ -90,6 +91,7 @@ def initialize_services(app: Flask) -> None:
     app.stt_service = STTService()
     app.tts_service = TTSService()
     app.weather_service = WeatherService()
+    app.domain_guard = DomainGuard()
     app.prompt_manager = PromptManager()
 
     app.logger.info("All services initialized successfully.")

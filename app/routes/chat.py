@@ -77,6 +77,7 @@ def _get_services():
         current_app.memory_service,
         current_app.stt_service,
         current_app.tts_service,
+        current_app.domain_guard,
     )
 
 
@@ -96,7 +97,7 @@ def chat():
         JSON response with 'text' (response) and optionally 'voice' (audio URL).
     """
     session_id = _get_session_id()
-    llm_service, memory_service, stt_service, tts_service = _get_services()
+    llm_service, memory_service, stt_service, tts_service, domain_guard = _get_services()
 
     # --- Handle Audio Input ---
     if 'audio' in request.files:
@@ -127,7 +128,7 @@ def chat():
                 # Process the transcribed text
                 response_data = _process_text_query(
                     session_id, transcription,
-                    llm_service, memory_service, tts_service
+                    llm_service, memory_service, tts_service, domain_guard
                 )
                 response_data['transcription'] = transcription
                 return jsonify(response_data)
@@ -152,6 +153,19 @@ def chat():
 
                 image_b64 = base64.b64encode(image_data).decode('utf-8')
                 mime_type = _get_mime_type(image_file.filename)
+
+                # Domain Validation
+                is_valid, error_msg = domain_guard.validate_image(image_b64, mime_type)
+                
+                if not is_valid:
+                    memory_service.add_to_conversation(session_id, 'user', f"[Image] {text}")
+                    memory_service.add_to_conversation(session_id, 'assistant', error_msg)
+                    
+                    voice_filename = tts_service.synthesize(error_msg)
+                    result: Dict = {'text': error_msg}
+                    if voice_filename:
+                        result['voice'] = f'/static/audio/{voice_filename}'
+                    return jsonify(result)
 
                 # Generate vision response
                 history = memory_service.get_conversation_history(session_id)
@@ -196,7 +210,7 @@ def chat():
         return jsonify({'error': 'No text provided.'}), 400
 
     response_data = _process_text_query(
-        session_id, text, llm_service, memory_service, tts_service
+        session_id, text, llm_service, memory_service, tts_service, domain_guard
     )
     return jsonify(response_data)
 
@@ -242,14 +256,16 @@ def _process_text_query(
     llm_service,
     memory_service,
     tts_service,
+    domain_guard,
 ) -> Dict:
     """Process a text query through the LLM pipeline.
 
     Steps:
-        1. Retrieve conversation history from Redis.
-        2. Generate response using LangChain + LLM.
-        3. Save user and assistant messages to Redis.
-        4. Generate audio response via TTS.
+        1. Validate Domain
+        2. Retrieve conversation history from Redis.
+        3. Generate response using LLM.
+        4. Save user and assistant messages to Redis.
+        5. Generate audio response via TTS.
 
     Args:
         session_id: Current user session.
@@ -257,10 +273,23 @@ def _process_text_query(
         llm_service: LLM service instance.
         memory_service: Memory service instance.
         tts_service: TTS service instance.
+        domain_guard: DomainGuard service instance.
 
     Returns:
         Dict with 'text' (response) and optionally 'voice' (audio file URL).
     """
+    # 0. Validate Domain
+    is_valid, error_msg = domain_guard.validate_text(user_text)
+    if not is_valid:
+        memory_service.add_to_conversation(session_id, 'user', user_text)
+        memory_service.add_to_conversation(session_id, 'assistant', error_msg)
+        
+        voice_filename = tts_service.synthesize(error_msg)
+        result: Dict = {'text': error_msg}
+        if voice_filename:
+            result['voice'] = f'/static/audio/{voice_filename}'
+        return result
+
     # 1. Get conversation history
     history = memory_service.get_conversation_history(session_id)
 
