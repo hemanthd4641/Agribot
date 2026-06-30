@@ -14,4 +14,4 @@ RUN mkdir -p uploads app/static/audio
 
 EXPOSE 10000
 
-CMD ["gunicorn", "app:create_app()", "--config", "gunicorn.conf.py", "--factory"]
+CMD ["gunicorn", "app:create_app()", "--config", "gunicorn.conf.py"]
